@@ -1,0 +1,62 @@
+name: Verify RepoInsight AI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  docker-smoke-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      # A placeholder is sufficient for automatic startup tests. A repository Actions secret
+      # named GEMINI_API_KEY is used only for a manually started AI end-to-end test.
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY || 'ci-placeholder-not-a-real-key' }}
+      DB_PASSWORD: repo_password
+      MYSQL_ROOT_PASSWORD: root_password
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Build and start application containers
+        run: docker compose up --build --detach
+
+      - name: Wait for RepoInsight AI to become available
+        run: |
+          for attempt in {1..30}; do
+            if curl --fail --silent http://localhost:8080/ > /dev/null; then
+              echo "RepoInsight AI is available on port 8080."
+              exit 0
+            fi
+            sleep 4
+          done
+          echo "The application did not become available in time."
+          docker compose logs
+          exit 1
+
+      - name: Run optional Gemini end-to-end test
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          if [ "$GEMINI_API_KEY" = "ci-placeholder-not-a-real-key" ]; then
+            echo "Add a repository Actions secret named GEMINI_API_KEY before running this manual test."
+            exit 1
+          fi
+          curl --fail --silent --show-error --request POST http://localhost:8080/api/repositories/analyze \
+            --header 'Content-Type: application/json' \
+            --data '{"repositoryUrl":"octocat/Hello-World"}' > repository.json
+          curl --fail --silent --show-error --request POST http://localhost:8080/api/insights/generate \
+            --header 'Content-Type: application/json' \
+            --data-binary @repository.json > insight.json
+          jq --exit-status '.insight.summary | strings | length > 0' insight.json
+          echo "GitHub, Gemini, Java application, and MySQL were verified end-to-end."
+
+      - name: Print container logs on failure
+        if: failure()
+        run: docker compose logs
+
+      - name: Stop containers
+        if: always()
+        run: docker compose down --volumes
