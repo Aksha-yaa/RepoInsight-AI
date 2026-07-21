@@ -1,0 +1,32 @@
+services:
+  database:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: repo_intelligence
+      MYSQL_USER: repo_user
+      MYSQL_PASSWORD: ${DB_PASSWORD:-repo_password}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root_password}
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${MYSQL_ROOT_PASSWORD:-root_password}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+  app:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      DB_URL: jdbc:mysql://database:3306/repo_intelligence?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      DB_USER: repo_user
+      DB_PASSWORD: ${DB_PASSWORD:-repo_password}
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.5-flash}
+    depends_on:
+      database:
+        condition: service_healthy
+volumes:
+  mysql_data:
