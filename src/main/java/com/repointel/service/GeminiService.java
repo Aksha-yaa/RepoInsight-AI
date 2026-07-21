@@ -19,7 +19,7 @@ public class GeminiService {
                 "Repository: " + repo.owner() + "/" + repo.name() + "\nDescription: " + repo.description() + "\nLanguages: " + repo.languages() + "\nTopics: " + repo.topics() + "\nFiles: " + repo.files().stream().limit(80).collect(Collectors.joining(", ")) + "\nRecent commits: " + repo.recentCommits() + "\nREADME (truncated):\n" + repo.readme().substring(0, Math.min(12000, repo.readme().length()));
         JsonObject payload = new JsonObject(); JsonArray contents = new JsonArray(); JsonObject content = new JsonObject(); JsonArray parts = new JsonArray(); JsonObject part = new JsonObject(); part.addProperty("text", prompt); parts.add(part); content.add("parts", parts); contents.add(content); payload.add("contents", contents);
         try {
-            String model = Config.get("GEMINI_MODEL", "gemini-3.5-flash");
+            String model = Config.get("GEMINI_MODEL", "gemini-2.5-flash");
             HttpRequest request = HttpRequest.newBuilder(URI.create("https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent"))
                     .header("Content-Type", "application/json").header("x-goog-api-key", key)
                     .POST(HttpRequest.BodyPublishers.ofString(gson.toJson(payload))).build();
