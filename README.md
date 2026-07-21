@@ -139,6 +139,3 @@ The application uses JDBC prepared statements and a transaction when saving a re
 - The GitHub Actions workflow verifies Docker build and application startup after upload.
 - A full AI result requires a valid `GEMINI_API_KEY` at runtime; test it by analyzing a public repository after deployment.
 
-## License
-
-Add your preferred license before publishing, for example MIT.
