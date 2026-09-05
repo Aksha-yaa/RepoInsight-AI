@@ -5,6 +5,8 @@ import com.repointel.model.RepositoryData;
 import com.repointel.util.ApiException;
 import com.repointel.util.Config;
 import java.net.URI;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.net.http.*;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
@@ -23,14 +25,57 @@ public class GitHubService {
         List<String> topics = new ArrayList<>();
         JsonArray topicArray = repository.has("topics") ? repository.getAsJsonArray("topics") : new JsonArray();
         topicArray.forEach(t -> topics.add(t.getAsString()));
-        String readme = getReadme(base);
-        List<String> files = getFiles(base, repository.get("default_branch").getAsString());
-        List<String> commits = getCommits(base);
+        // DEFER fetching heavy assets (README, file list, commits).
+        // The agent loop will fetch these on demand via the public helper methods below.
+        String readme = "";
+        List<String> files = List.of();
+        List<String> commits = List.of();
         return new RepositoryData(repository.get("html_url").getAsString(), owner, name,
                 nullableString(repository, "description"), repository.get("stargazers_count").getAsLong(),
                 repository.get("forks_count").getAsLong(), repository.get("subscribers_count").getAsLong(),
                 repository.get("open_issues_count").getAsLong(), repository.get("default_branch").getAsString(),
                 repository.get("updated_at").getAsString(), languages, topics, readme, files, commits);
+    }
+
+    // --- Public tool methods used by the Gemini agent loop ---
+    public List<String> getFileTree(String repositoryUrl) throws ApiException {
+        String[] parts = parseUrl(repositoryUrl);
+        String owner = parts[0], name = parts[1], base = "https://api.github.com/repos/" + owner + "/" + name;
+        JsonObject repository = getObject(base);
+        String branch = repository.has("default_branch") ? repository.get("default_branch").getAsString() : "main";
+        return getFiles(base, branch);
+    }
+
+    public String getFileContents(String repositoryUrl, String path) throws ApiException {
+        try {
+            String[] parts = parseUrl(repositoryUrl);
+            String owner = parts[0], name = parts[1], base = "https://api.github.com/repos/" + owner + "/" + name;
+            JsonObject repository = getObject(base);
+            String branch = repository.has("default_branch") ? repository.get("default_branch").getAsString() : "main";
+            String encoded = URLEncoder.encode(path, StandardCharsets.UTF_8);
+            JsonObject value = request(base + "/contents/" + encoded + "?ref=" + branch).getAsJsonObject();
+            if (value.has("content")) {
+                return new String(Base64.getMimeDecoder().decode(value.get("content").getAsString()), StandardCharsets.UTF_8);
+            }
+            throw new ApiException("File content not available for path: " + path);
+        } catch (ApiException e) { throw e; } catch (Exception e) { throw new ApiException("Could not fetch file contents.", e); }
+    }
+
+    public String getReadmeForRepo(String repositoryUrl) throws ApiException {
+        String[] parts = parseUrl(repositoryUrl);
+        String owner = parts[0], name = parts[1], base = "https://api.github.com/repos/" + owner + "/" + name;
+        return getReadme(base);
+    }
+
+    public List<String> getRecentCommits(String repositoryUrl, int limit) throws ApiException {
+        try {
+            String[] parts = parseUrl(repositoryUrl);
+            String owner = parts[0], name = parts[1], base = "https://api.github.com/repos/" + owner + "/" + name;
+            JsonArray arr = request(base + "/commits?per_page=" + Math.max(1, Math.min(100, limit))).getAsJsonArray();
+            List<String> commits = new ArrayList<>();
+            for (JsonElement e : arr) commits.add(e.getAsJsonObject().getAsJsonObject("commit").get("message").getAsString().split("\\R")[0]);
+            return commits;
+        } catch (ApiException e) { throw e; } catch (Exception e) { throw new ApiException("Could not fetch commits.", e); }
     }
 
     private String[] parseUrl(String input) throws ApiException {
