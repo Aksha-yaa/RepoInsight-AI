@@ -1,9 +1,6 @@
 package com.repointel.service;
 
-import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
+import com.google.gson.*;
 import com.repointel.model.RepositoryData;
 import com.repointel.util.ApiException;
 import com.repointel.util.Config;
@@ -15,6 +12,7 @@ import java.util.*;
 
 public class GitHubService {
     private final HttpClient client = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NORMAL).build();
+    private final Gson gson = new Gson();
     private final String token = Config.get("GITHUB_TOKEN", "");
 
     public RepositoryData analyze(String repositoryUrl) throws ApiException {
