@@ -53,7 +53,7 @@ public class GeminiService {
 
             JsonObject response = callGemini(payload, key);
             JsonArray candidates = response.getAsJsonArray("candidates");
-            if (candidates == null || candidates.isEmpty()) throw new ApiException("Gemini returned no candidates:\n" + response);
+            if (candidates == null || candidates.size() == 0) throw new ApiException("Gemini returned no candidates:\n" + response);
 
             JsonObject modelContent = candidates.get(0).getAsJsonObject().getAsJsonObject("content");
             if (modelContent == null || !modelContent.has("parts")) throw new ApiException("Gemini returned no content parts.");
