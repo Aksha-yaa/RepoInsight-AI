@@ -1,28 +1,4 @@
 <!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>RepoInsight AI</title>
-  <link rel="stylesheet" href="assets/styles.css">
-</head>
-<body>
-  <main class="app-shell">
-    <header class="site-header"><div class="brand"><span class="brand-mark">RI</span><span>RepoInsight <b>AI</b></span></div><span class="status-chip">Repository intelligence</span></header>
-    <section class="intro"><p class="eyebrow">EVIDENCE-LED CODE REVIEW</p><h1>Understand a repository before you open the first file.</h1><p class="intro-copy">Give RepoInsight a public GitHub repository. The analysis agent chooses the evidence it needs, then organizes its findings into a clear engineering report.</p></section>
-    <section class="search-panel" aria-label="Repository analysis"><form id="analysis-form"><label for="repository-url">GitHub repository</label><div class="search-row"><input id="repository-url" type="url" required placeholder="https://github.com/owner/repository" aria-label="GitHub repository URL"><button type="submit">Analyze repository</button></div></form><div class="try-links"><span>Try an example:</span><button type="button" data-example="https://github.com/facebook/react">facebook/react</button><button type="button" data-example="https://github.com/vercel/next.js">vercel/next.js</button><button type="button" data-example="https://github.com/shadcn-ui/ui">shadcn-ui/ui</button></div></section>
-    <section id="loading" class="loading hidden" aria-live="polite"><span class="loader"></span><span id="load-message">Reading repository evidence...</span></section>
-    <section id="dashboard" class="dashboard hidden">
-      <article class="repo-card"><div class="repo-heading"><span class="repo-mark">/</span><div><p class="eyebrow">CURRENT REPOSITORY</p><h2 id="repo-name"></h2><a id="repo-url" target="_blank" rel="noopener">Open on GitHub</a><p id="repo-description"></p></div></div><div class="stat-grid"><div><strong id="stars">0</strong><span>Stars</span></div><div><strong id="forks">0</strong><span>Forks</span></div><div><strong id="watchers">0</strong><span>Watchers</span></div><div><strong id="issues">0</strong><span>Open issues</span></div></div><div class="repo-meta"><div><span>Primary language</span><b id="primary-language">-</b></div><div><span>Default branch</span><b id="branch">-</b></div><div><span>Last updated</span><b id="updated">-</b></div></div></article>
-      <section class="report-header"><div><p class="eyebrow">ANALYSIS REPORT</p><h2>What the agent found</h2></div><button id="close-report" class="secondary-button" type="button">Close report</button></section>
-      <section class="report-grid" aria-label="Analysis report"><article class="report-section report-summary"><p class="section-label">01 / SUMMARY</p><div id="summary"></div></article><article class="report-section"><p class="section-label">02 / ARCHITECTURE</p><div id="architecture"></div></article><article class="report-section"><p class="section-label">03 / TECHNOLOGY INSIGHTS</p><div id="technology-insights"></div></article><article class="report-section"><p class="section-label">04 / RECOMMENDATIONS</p><div id="recommendations"></div></article></section>
-      <section class="evidence-grid"><article class="evidence-panel"><div class="panel-heading"><h3>Technology signals</h3><span id="primary-language-badge"></span></div><div id="topics" class="pills"></div><h4>Language breakdown</h4><div id="languages"></div></article><article class="evidence-panel"><div class="panel-heading"><h3>Repository files</h3><span id="file-count"></span></div><ul id="files" class="file-list"></ul></article><article class="evidence-panel evidence-wide"><div class="panel-heading"><h3>README</h3><span>Source document</span></div><div id="readme" class="long-text"></div></article></section>
-    </section>
-    <section id="history" class="history-panel"><div class="section-heading"><div><p class="eyebrow">YOUR ARCHIVE</p><h2>Saved reports</h2></div><button id="refresh-history" class="secondary-button" type="button">Refresh</button></div><div id="history-list" class="history-list"></div><p id="history-empty" class="empty-state">No saved reports yet.</p></section>
-  </main>
-  <script src="assets/app.js"></script>
-</body>
-</html><!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>RepoInsight AI</title><link rel="stylesheet" href="assets/styles.css"></head>
 <body>
