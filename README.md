@@ -2,24 +2,25 @@
 
 > AI-powered GitHub repository intelligence built with Java 17, Servlets, MySQL, GitHub REST API, and Google Gemini.
 
-RepoInsight AI turns a public GitHub repository URL into a concise engineering dashboard. It collects repository metadata and code signals from GitHub, asks Gemini for an evidence-based analysis, and stores reports in MySQL for later review.
+RepoInsight AI turns a public GitHub repository URL into an evidence-based engineering dashboard. A Gemini analysis agent decides which repository signals it needs, calls GitHub tools one at a time, produces four distinct report sections, and stores the finished report in MySQL for later review.
 
 ## What it does
 
 - Accepts either `owner/repository` or a full public GitHub repository URL.
-- Collects repository metadata, description, stars, forks, watchers, issues, languages, topics, README, file structure, and recent commits.
-- Generates AI-powered project summary, architecture notes, technology insights, and improvement recommendations.
-- Displays a clean tabbed dashboard for technology, architecture, recommendations, README, and files.
-- Saves successful AI reports to MySQL and exposes report history.
+- Collects repository metadata first, then lets the analysis agent request the README, file tree, individual files, and recent commits only when needed.
+- Generates four independent AI report sections: summary, architecture, technology insights, and recommendations.
+- Verifies a generated test claim against the fetched file tree before the report is saved.
+- Displays a responsive report dashboard with repository evidence and readable saved-report history.
+- Saves all four report sections to MySQL and loads the complete report when history is opened.
 
 ## Dashboard preview
 
 The dashboard contains a repository overview, activity counters, AI summary, language breakdown, technology tags, and interactive analysis tabs.
 
 ```text
-GitHub URL → Java Servlet → GitHub REST API → Gemini API → MySQL
-     ↑                                                     ↓
-     └──────────── Responsive Vanilla JavaScript UI ──────┘
+GitHub URL → Java Servlet → Gemini agent ⇄ GitHub tools → MySQL
+    ↑                                             ↓
+    └──────────── Responsive Vanilla JavaScript UI ┘
 ```
 
 ## Architecture
@@ -27,8 +28,8 @@ GitHub URL → Java Servlet → GitHub REST API → Gemini API → MySQL
 ```mermaid
 flowchart LR
     U[Browser: HTML, CSS, Vanilla JS] --> S[Java 17 Servlet API]
-    S --> G[GitHub REST API]
     S --> AI[Google Gemini API]
+    AI --> G[GitHub REST API tools]
     S --> R[RepositoryService]
     R --> DB[(MySQL via JDBC)]
 ```
@@ -40,7 +41,7 @@ flowchart LR
 | Frontend | HTML5, CSS3, Vanilla JavaScript |
 | Backend | Core Java 17, Jakarta Servlets, Java HTTP Client |
 | Data access | JDBC, MySQL 8, prepared statements |
-| AI and APIs | Google Gemini API, GitHub REST API |
+| AI and APIs | Google Gemini function calling, GitHub REST API |
 | Build and deployment | Maven, Docker, Docker Compose, GitHub Actions |
 
 ## Project structure
@@ -63,7 +64,7 @@ docker-compose.yml  # Application and MySQL services
 | Method | Endpoint | Description |
 | --- | --- | --- |
 | `POST` | `/api/repositories/analyze` | Fetches GitHub data for `{ "repositoryUrl": "owner/repository" }` |
-| `POST` | `/api/insights/generate` | Gets Gemini insights and saves the analysis report |
+| `POST` | `/api/insights/generate` | Runs the Gemini tool-using agent and saves the four-section report |
 | `GET` | `/api/reports/` | Lists saved reports |
 | `GET` | `/api/reports/{id}` | Retrieves one saved report |
 
@@ -116,13 +117,29 @@ Open the repository's **Actions** tab after uploading the project. A green check
 
 This manual run starts Docker on GitHub's hosted runner, analyzes `octocat/Hello-World`, calls Gemini, saves the report to MySQL, and checks that a summary was returned. Your computer does not download or run Docker. The key is not printed in logs or committed to the repository.
 
+## Gemini analysis flow
+
+The agent receives the repository identifier and these functions:
+
+- `getFileTree` — fetches the repository file and folder structure.
+- `getFileContents` — fetches one repository-relative file.
+- `getReadme` — fetches the README when it is useful.
+- `getRecentCommits` — fetches a requested number of recent commit messages.
+- `generateReport` — ends the loop and returns the four report sections.
+
+The loop is limited to eight turns. GitHub tool failures are returned to Gemini as function responses containing an error, allowing the agent to adjust its investigation. If the agent does not call `generateReport`, the application saves a clearly marked partial report instead of failing with an unhandled exception.
+
+## Report history
+
+Each saved report stores summary, architecture details, technology insights, recommendations, and its generation timestamp. Selecting **Open full report** in the archive opens all four sections together. Generated text is normalized before saving and display so Markdown emphasis markers and typographic dash characters do not appear as raw output.
+
 ## Database schema
 
 The MySQL schema is initialized from `db/init.sql`.
 
 - `users` — optional ownership information for future authentication.
 - `repositories` — GitHub URL, language data, stars, forks, and analysis time.
-- `analysis_reports` — Gemini summary, architecture notes, recommendations, and generation time.
+- `analysis_reports` — Gemini summary, architecture notes, technology insights, recommendations, and generation time.
 
 The application uses JDBC prepared statements and a transaction when saving a repository/report pair.
 

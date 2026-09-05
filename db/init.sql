@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS repositories (
 );
 CREATE TABLE IF NOT EXISTS analysis_reports (
   report_id BIGINT AUTO_INCREMENT PRIMARY KEY, repository_id BIGINT NOT NULL, summary TEXT NOT NULL, architecture_details TEXT NOT NULL,
-  recommendations TEXT NOT NULL, generated_date TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  technology_insights TEXT NOT NULL, recommendations TEXT NOT NULL, generated_date TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT fk_reports_repository FOREIGN KEY (repository_id) REFERENCES repositories(repository_id) ON DELETE CASCADE
 );
+ALTER TABLE analysis_reports ADD COLUMN IF NOT EXISTS technology_insights TEXT NOT NULL AFTER architecture_details;
