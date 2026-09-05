@@ -55,7 +55,16 @@ jobs:
             --data '{"repositoryUrl":"octocat/Hello-World"}' > repository.json
           curl --fail --silent --show-error --request POST http://localhost:8080/api/insights/generate \
             --cookie cookies.txt --header 'Content-Type: application/json' \
-            --data-binary @repository.json > insight.json
+            --data-binary @repository.json > task.json
+          task_id=$(jq -r '.taskId' task.json)
+          for attempt in {1..60}; do
+            curl --fail --silent --show-error --request GET "http://localhost:8080/api/insights/tasks/$task_id" \
+              --cookie cookies.txt > insight.json
+            state=$(jq -r '.state' insight.json)
+            if [ "$state" = "SUCCEEDED" ]; then break; fi
+            if [ "$state" = "FAILED" ]; then cat insight.json; exit 1; fi
+            sleep 2
+          done
           jq --exit-status '.insight.summary | strings | length > 0' insight.json
           echo "GitHub, Gemini, Java application, and MySQL were verified end-to-end."
 

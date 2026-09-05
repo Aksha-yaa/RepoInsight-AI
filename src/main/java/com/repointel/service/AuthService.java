@@ -49,14 +49,6 @@ public class AuthService {
         }
     }
 
-    public boolean claimDemo(long userId) throws SQLException {
-        String sql = "UPDATE users SET demo_used = TRUE WHERE user_id = ? AND demo_used = FALSE";
-        try (Connection connection = database.getConnection(); PreparedStatement statement = connection.prepareStatement(sql)) {
-            statement.setLong(1, userId);
-            return statement.executeUpdate() == 1;
-        }
-    }
-
     private String normalizeEmail(String email) {
         if (email == null || !email.contains("@")) throw new IllegalArgumentException("Enter a valid email address.");
         return email.trim().toLowerCase(java.util.Locale.ROOT);

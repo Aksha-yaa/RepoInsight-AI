@@ -19,6 +19,10 @@ public class RepositoryService {
         try (Connection connection = database.getConnection()) {
             connection.setAutoCommit(false);
             try (PreparedStatement repositoryStatement = connection.prepareStatement(repositorySql, Statement.RETURN_GENERATED_KEYS)) {
+                try (PreparedStatement demoStatement = connection.prepareStatement("UPDATE users SET demo_used = TRUE WHERE user_id = ? AND demo_used = FALSE")) {
+                    demoStatement.setLong(1, userId);
+                    if (demoStatement.executeUpdate() != 1) throw new SQLException("Your free demo has already been used.");
+                }
                 repositoryStatement.setLong(1, userId);
                 repositoryStatement.setString(2, repository.owner() + "/" + repository.name());
                 repositoryStatement.setString(3, repository.url());
@@ -75,10 +79,6 @@ public class RepositoryService {
                 return rs.next() ? Optional.of(report(rs)) : Optional.empty();
             }
         }
-    }
-
-    public boolean claimDemo(long userId) throws SQLException {
-        return new AuthService().claimDemo(userId);
     }
 
     private AnalysisReport report(ResultSet rs) throws SQLException {

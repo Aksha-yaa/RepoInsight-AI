@@ -65,7 +65,8 @@ docker-compose.yml  # Application and MySQL services
 | Method | Endpoint | Description |
 | --- | --- | --- |
 | `POST` | `/api/repositories/analyze` | Fetches GitHub data for `{ "repositoryUrl": "owner/repository" }` |
-| `POST` | `/api/insights/generate` | Runs the Gemini tool-using agent and saves the four-section report |
+| `POST` | `/api/insights/generate` | Queues the Gemini tool-using agent and returns a task ID |
+| `GET` | `/api/insights/tasks/{id}` | Polls an owner-scoped analysis task until it succeeds or fails |
 | `GET` | `/api/reports/` | Lists saved reports |
 | `GET` | `/api/reports/{id}` | Retrieves one saved report |
 | `POST` | `/api/auth/register` | Creates an account and starts a session |
@@ -133,11 +134,11 @@ The agent receives the repository identifier and these functions:
 - `getRecentCommits` — fetches a requested number of recent commit messages.
 - `generateReport` — ends the loop and returns the four report sections.
 
-The loop is limited to eight turns. GitHub tool failures are returned to Gemini as function responses containing an error, allowing the agent to adjust its investigation. If the agent does not call `generateReport`, the application saves a clearly marked partial report instead of failing with an unhandled exception.
+The loop is limited to eight turns. GitHub tool failures are returned to Gemini as function responses containing an error, allowing the agent to adjust its investigation. The servlet submits the work to a four-thread JVM worker pool and the browser polls an owner-scoped task endpoint, so the HTTP request is not held open across all Gemini round-trips. If the agent does not call `generateReport`, the application saves a clearly marked partial report instead of failing with an unhandled exception.
 
 ## Accounts, demo access, and report history
 
-Accounts use server-side HTTP sessions and PBKDF2-HMAC-SHA256 password hashes. Each account receives one free analysis. The database atomically marks that demo as used before the agent starts, which prevents duplicate concurrent free analyses but means a failed analysis attempt also consumes the demo. This is an intentional abuse-control tradeoff; paid usage or retries should be added later with billing or an administrator reset flow.
+Accounts use server-side HTTP sessions and PBKDF2-HMAC-SHA256 password hashes. Each account receives one free analysis. The database marks that demo as used in the same transaction that inserts the completed report, so Gemini/API/database failures roll back the entitlement update. Concurrent submissions are serialized by the conditional database update; only one can save successfully. This is an intentional abuse-control tradeoff; paid usage or retries should be added later with billing or an administrator reset flow.
 
 Every saved repository belongs to the authenticated account. Both the history list and report-detail query filter by that account, so knowing another report ID does not grant access to it. Each report stores summary, architecture details, technology insights, recommendations, generation time, README content, file-tree paths, recent commit messages, and bounded excerpts of individual source files fetched by the agent. Selecting **Open full report** opens the complete saved evidence.
 

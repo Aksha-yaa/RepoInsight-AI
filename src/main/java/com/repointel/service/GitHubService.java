@@ -1,6 +1,9 @@
 package com.repointel.service;
 
-import com.google.gson.*;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import com.repointel.model.RepositoryData;
 import com.repointel.util.ApiException;
 import com.repointel.util.Config;

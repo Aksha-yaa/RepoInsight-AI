@@ -32,10 +32,28 @@ function showApp(account) { $('#auth-gate').classList.add('hidden'); $('#app-con
 async function analyze(event) {
   event.preventDefault(); const repositoryUrl = $('#repository-url').value.trim(); if (!repositoryUrl) return;
   $('#dashboard').classList.add('hidden'); $('#loading').classList.remove('hidden'); $('#load-message').textContent = 'Reading repository evidence...';
-  try { const repository = await post('/api/repositories/analyze', {repositoryUrl}); $('#load-message').textContent = 'Generating evidence-based report...'; const result = await post('/api/insights/generate', repository); renderRepository({...result.repository, readme: result.insight.readme, files: result.insight.files, recentCommits: result.insight.recentCommits, fetchedFiles: result.insight.fetchedFiles}); renderReport(result.insight); $('#dashboard').classList.remove('hidden'); window.scrollTo({top: 0, behavior: 'smooth'}); loadHistory(); }
+  try {
+    const repository = await post('/api/repositories/analyze', {repositoryUrl});
+    $('#load-message').textContent = 'Queued. The analysis agent is gathering evidence...';
+    const queued = await post('/api/insights/generate', repository);
+    const result = await pollTask(queued.taskId);
+    renderRepository({...result.repository, readme: result.insight.readme, files: result.insight.files, recentCommits: result.insight.recentCommits, fetchedFiles: result.insight.fetchedFiles});
+    renderReport(result.insight); $('#demo-status').textContent = 'Free demo used'; $('#dashboard').classList.remove('hidden'); window.scrollTo({top: 0, behavior: 'smooth'}); loadHistory();
+  }
   catch (error) { alert(error.message); } finally { $('#loading').classList.add('hidden'); }
 }
 async function post(url, body) { const response = await fetch(url, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)}); const data = await response.json(); if (!response.ok) throw new Error(data.error || 'Request could not be completed.'); return data; }
+async function pollTask(taskId) {
+  for (;;) {
+    const response = await fetch(`/api/insights/tasks/${encodeURIComponent(taskId)}`);
+    const task = await response.json();
+    if (!response.ok) throw new Error(task.error || task.message || 'The analysis task failed.');
+    $('#load-message').textContent = task.message || 'The analysis agent is working...';
+    if (task.state === 'SUCCEEDED') return task;
+    if (task.state === 'FAILED') throw new Error(task.message || 'The analysis could not be completed.');
+    await new Promise(resolve => setTimeout(resolve, 1200));
+  }
+}
 function renderRepository(repo) {
   $('#repo-name').textContent = `${repo.owner || ''}/${repo.name || ''}`; $('#repo-url').href = repo.url || '#'; $('#repo-description').textContent = repo.description || 'No description provided.';
   $('#stars').textContent = number(repo.stars); $('#forks').textContent = number(repo.forks); $('#watchers').textContent = number(repo.watchers); $('#issues').textContent = number(repo.openIssues);
@@ -43,7 +61,7 @@ function renderRepository(repo) {
   $('#primary-language').textContent = languages[0]?.[0] || '-'; $('#primary-language-badge').textContent = languages[0]?.[0] || 'No language data'; $('#branch').textContent = repo.defaultBranch || '-'; $('#updated').textContent = repo.updatedAt ? new Date(repo.updatedAt).toLocaleDateString('en-GB') : '-';
   const detected = [...languages.map(([name]) => name), ...(repo.topics || [])].slice(0, 16); $('#topics').innerHTML = detected.map(item => `<span class="pill">${escapeHtml(item)}</span>`).join('') || '<span>No detected technologies.</span>';
   $('#languages').innerHTML = languages.map(([name, amount]) => `<div class="language"><label><span>${escapeHtml(name)}</span><span>${Math.round(amount / total * 100)}%</span></label><div class="bar"><i style="width:${amount / total * 100}%"></i></div></div>`).join('') || '<span>No language data.</span>';
-  const files = repo.files || []; $('#file-count').textContent = `${files.length} files`; $('#files').innerHTML = files.slice(0, 200).map(file => `<li>${escapeHtml(file)}</li>`).join('') || '<li>No file tree was saved.</li>'; const commits = repo.recentCommits || []; $('#commit-count').textContent = `${commits.length} commits`; $('#commits').innerHTML = commits.map(commit => `<li>${escapeHtml(commit)}</li>`).join('') || '<li>No commit history was saved.</li>'; const fetched = repo.fetchedFiles || {}; const fetchedEntries = Object.entries(fetched); $('#fetched-file-count').textContent = `${fetchedEntries.length} files`; $('#fetched-files').innerHTML = fetchedEntries.map(([path, contents]) => `<details><summary>${escapeHtml(path)}</summary><pre>${escapeHtml(contents)}</pre></details>`).join('') || '<span>No individual source files were fetched.</span>'; $('#readme').innerHTML = text(repo.readme || 'README was not saved for this report.');
+  const files = repo.files || []; $('#file-count').textContent = `${files.length} files`; $('#files').innerHTML = files.slice(0, 200).map(file => `<li>${escapeHtml(file)}</li>`).join('') || '<li>No file tree was saved.</li>'; const commits = repo.recentCommits || []; $('#commit-count').textContent = `${commits.length} commits`; $('#commits').innerHTML = commits.map(commit => `<li>${escapeHtml(commit)}</li>`).join('') || '<li>No commit history was saved.</li>'; const fetched = repo.fetchedFiles || {}; const fetchedEntries = Object.entries(fetched); $('#fetched-file-count').textContent = `${fetchedEntries.length} files`; $('#fetched-files').innerHTML = fetchedEntries.map(([path, contents]) => `<details open><summary>${escapeHtml(path)}</summary><pre>${escapeHtml(contents)}</pre></details>`).join('') || '<span>No individual source files were fetched.</span>'; $('#readme').innerHTML = text(repo.readme || 'README was not saved for this report.');
 }
 function renderReport(insight) { $('#summary').innerHTML = text(insight.summary); $('#architecture').innerHTML = text(insight.architecture); $('#technology-insights').innerHTML = text(insight.technologyInsights); $('#recommendations').innerHTML = text(insight.recommendations); }
 function number(value) { return Number(value || 0).toLocaleString(); }
