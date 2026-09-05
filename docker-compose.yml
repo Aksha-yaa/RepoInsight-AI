@@ -24,7 +24,7 @@ services:
       DB_PASSWORD: ${DB_PASSWORD:-repo_password}
       GITHUB_TOKEN: ${GITHUB_TOKEN:-}
       GEMINI_API_KEY: ${GEMINI_API_KEY}
-      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.5-flash}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash}
     depends_on:
       database:
         condition: service_healthy

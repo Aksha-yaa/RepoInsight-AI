@@ -13,6 +13,7 @@ import java.util.Map;
 public class RepositoryAnalysisServlet extends HttpServlet {
     private final GitHubService github = new GitHubService();
     @Override protected void doPost(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        if (AuthServlet.userId(request) == null) { JsonResponse.send(response, 401, Map.of("error", "Create an account or sign in to use the demo.")); return; }
         try { JsonObject body = JsonParser.parseReader(request.getReader()).getAsJsonObject(); JsonResponse.send(response, 200, github.analyze(body.get("repositoryUrl").getAsString())); }
         catch (ApiException e) { JsonResponse.send(response, 400, Map.of("error", e.getMessage())); }
         catch (Exception e) { JsonResponse.send(response, 500, Map.of("error", "Unable to analyze this repository.")); }

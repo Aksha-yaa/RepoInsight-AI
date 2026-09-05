@@ -11,7 +11,9 @@ import java.util.Map;
 public class ReportHistoryServlet extends HttpServlet {
     private final RepositoryService repositories = new RepositoryService();
     @Override protected void doGet(HttpServletRequest request, HttpServletResponse response) throws IOException {
-        try { String path = request.getPathInfo(); if (path == null || "/".equals(path)) JsonResponse.send(response, 200, repositories.history()); else { long id = Long.parseLong(path.substring(1)); repositories.find(id).ifPresentOrElse(report -> { try { JsonResponse.send(response, 200, report); } catch (IOException e) { throw new RuntimeException(e); } }, () -> { try { JsonResponse.send(response, 404, Map.of("error", "Report not found.")); } catch (IOException e) { throw new RuntimeException(e); } }); } }
+        Long userId = AuthServlet.userId(request);
+        if (userId == null) { JsonResponse.send(response, 401, Map.of("error", "Sign in to view your history.")); return; }
+        try { String path = request.getPathInfo(); if (path == null || "/".equals(path)) JsonResponse.send(response, 200, repositories.history(userId)); else { long id = Long.parseLong(path.substring(1)); repositories.find(userId, id).ifPresentOrElse(report -> { try { JsonResponse.send(response, 200, report); } catch (IOException e) { throw new RuntimeException(e); } }, () -> { try { JsonResponse.send(response, 404, Map.of("error", "Report not found.")); } catch (IOException e) { throw new RuntimeException(e); } }); } }
         catch (Exception e) { JsonResponse.send(response, 500, Map.of("error", "Report history is unavailable.")); }
     }
 }

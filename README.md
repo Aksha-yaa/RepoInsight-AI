@@ -11,7 +11,8 @@ RepoInsight AI turns a public GitHub repository URL into an evidence-based engin
 - Generates four independent AI report sections: summary, architecture, technology insights, and recommendations.
 - Verifies a generated test claim against the fetched file tree before the report is saved.
 - Displays a responsive report dashboard with repository evidence and readable saved-report history.
-- Saves all four report sections to MySQL and loads the complete report when history is opened.
+- Requires an account, provides one free analysis per account, and keeps each account's history private.
+- Saves all four report sections plus fetched README, file-tree, and commit evidence to MySQL and loads the complete report when history is opened.
 
 ## Dashboard preview
 
@@ -67,6 +68,10 @@ docker-compose.yml  # Application and MySQL services
 | `POST` | `/api/insights/generate` | Runs the Gemini tool-using agent and saves the four-section report |
 | `GET` | `/api/reports/` | Lists saved reports |
 | `GET` | `/api/reports/{id}` | Retrieves one saved report |
+| `POST` | `/api/auth/register` | Creates an account and starts a session |
+| `POST` | `/api/auth/login` | Starts an account session |
+| `POST` | `/api/auth/logout` | Ends the current session |
+| `GET` | `/api/auth` | Returns the current session account |
 
 ## Run with Docker
 
@@ -82,6 +87,7 @@ MYSQL_ROOT_PASSWORD=change_this_for_production
 ```
 
 `GEMINI_API_KEY` is required to generate AI analysis. `GITHUB_TOKEN` is optional but recommended because it increases GitHub API rate limits.
+The default Gemini model is `gemini-2.5-flash`; set `GEMINI_MODEL` explicitly if your API project uses another currently supported model.
 
 ### 2. Start the application
 
@@ -129,30 +135,39 @@ The agent receives the repository identifier and these functions:
 
 The loop is limited to eight turns. GitHub tool failures are returned to Gemini as function responses containing an error, allowing the agent to adjust its investigation. If the agent does not call `generateReport`, the application saves a clearly marked partial report instead of failing with an unhandled exception.
 
-## Report history
+## Accounts, demo access, and report history
 
-Each saved report stores summary, architecture details, technology insights, recommendations, and its generation timestamp. Selecting **Open full report** in the archive opens all four sections together. Generated text is normalized before saving and display so Markdown emphasis markers and typographic dash characters do not appear as raw output.
+Accounts use server-side HTTP sessions and PBKDF2-HMAC-SHA256 password hashes. Each account receives one free analysis. The database atomically marks that demo as used before the agent starts, which prevents duplicate concurrent free analyses but means a failed analysis attempt also consumes the demo. This is an intentional abuse-control tradeoff; paid usage or retries should be added later with billing or an administrator reset flow.
+
+Every saved repository belongs to the authenticated account. Both the history list and report-detail query filter by that account, so knowing another report ID does not grant access to it. Each report stores summary, architecture details, technology insights, recommendations, generation time, README content, file-tree paths, recent commit messages, and bounded excerpts of individual source files fetched by the agent. Selecting **Open full report** opens the complete saved evidence.
 
 ## Database schema
 
 The MySQL schema is initialized from `db/init.sql`.
 
-- `users` — optional ownership information for future authentication.
+- `users` — authenticated accounts, PBKDF2 password hashes, and one-time demo state.
 - `repositories` — GitHub URL, language data, stars, forks, and analysis time.
-- `analysis_reports` — Gemini summary, architecture notes, technology insights, recommendations, and generation time.
+- `analysis_reports` — Gemini report sections, fetched README, file tree, recent commits, bounded source excerpts, and generation time.
 
 The application uses JDBC prepared statements and a transaction when saving a repository/report pair.
+
+### Existing database volumes
+
+The new account schema is applied automatically only when MySQL initializes a new database volume. If upgrading an existing deployment created by an earlier version, back up the database and recreate the development volume or run a reviewed migration before deploying. Existing anonymous reports cannot be safely assigned to a user automatically.
 
 ## Security notes
 
 - Never commit `.env`, API keys, passwords, or access tokens.
 - Keep `GEMINI_API_KEY` in encrypted host or GitHub secrets for deployed environments.
 - Use a GitHub token with only the permissions you need.
+- Serve production traffic over HTTPS and configure the session cookie as secure at the TLS-terminating deployment edge; the local Docker smoke test uses HTTP.
+- Account registration limits one analysis per account, but it is not a payment or identity-verification system. Add email verification, rate limiting, CAPTCHA, or billing before treating the demo limit as a commercial entitlement.
 - This application analyzes public repositories only.
+
 
 ## Current verification status
 
-- Frontend JavaScript syntax has been checked.
+- Frontend files have passed the available editor diagnostics; run the Docker workflow for a full containerized verification.
 - The GitHub Actions workflow verifies Docker build and application startup after upload.
 - A full AI result requires a valid `GEMINI_API_KEY` at runtime; test it by analyzing a public repository after deployment.
 

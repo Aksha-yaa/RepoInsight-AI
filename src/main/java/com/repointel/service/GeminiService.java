@@ -11,13 +11,17 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.util.List;
 import java.util.Locale;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.logging.Logger;
 
 public class GeminiService {
     private static final Logger LOGGER = Logger.getLogger(GeminiService.class.getName());
     private static final int MAX_TURNS = 8;
 
-    public record Insight(String summary, String architecture, String technologyInsights, String recommendations) { }
+    public record Insight(String summary, String architecture, String technologyInsights, String recommendations,
+                          String readme, List<String> files, List<String> recentCommits,
+                          Map<String, String> fetchedFiles) { }
 
     private final HttpClient client = HttpClient.newHttpClient();
     private final Gson gson = new Gson();
@@ -39,6 +43,9 @@ public class GeminiService {
         tools.add(tool);
 
         java.util.List<String> fileTree = List.of();
+        String readme = "";
+        java.util.List<String> recentCommits = List.of();
+        Map<String, String> fetchedFiles = new LinkedHashMap<>();
         for (int turn = 0; turn < MAX_TURNS; turn++) {
             JsonObject payload = new JsonObject();
             payload.add("contents", conversation);
@@ -62,7 +69,7 @@ public class GeminiService {
             JsonObject args = functionCall.has("args") && functionCall.get("args").isJsonObject()
                     ? functionCall.getAsJsonObject("args") : new JsonObject();
 
-            if ("generateReport".equals(functionName)) return reportFrom(args, fileTree);
+            if ("generateReport".equals(functionName)) return reportFrom(args, fileTree, readme, recentCommits, fetchedFiles);
 
             JsonObject result = new JsonObject();
             try {
@@ -73,12 +80,19 @@ public class GeminiService {
                     }
                     case "getFileContents" -> {
                         if (!args.has("path") || args.get("path").getAsString().isBlank()) throw new ApiException("The path argument is required.");
-                        result.addProperty("result", github.getFileContents(repo.url(), args.get("path").getAsString()));
+                        String path = args.get("path").getAsString();
+                        String contents = github.getFileContents(repo.url(), path);
+                        fetchedFiles.put(path, contents.length() > 20000 ? contents.substring(0, 20000) + "\n[Excerpt truncated]" : contents);
+                        result.addProperty("result", contents);
                     }
-                    case "getReadme" -> result.addProperty("result", github.getReadmeForRepo(repo.url()));
+                    case "getReadme" -> {
+                        readme = github.getReadmeForRepo(repo.url());
+                        result.addProperty("result", readme);
+                    }
                     case "getRecentCommits" -> {
                         int limit = args.has("limit") ? args.get("limit").getAsInt() : 10;
-                        result.add("result", gson.toJsonTree(github.getRecentCommits(repo.url(), limit)));
+                        recentCommits = github.getRecentCommits(repo.url(), limit);
+                        result.add("result", gson.toJsonTree(recentCommits));
                     }
                     default -> result.addProperty("error", "Unknown function: " + functionName);
                 }
@@ -91,7 +105,7 @@ public class GeminiService {
         }
 
         LOGGER.warning("Gemini agent did not call generateReport within " + MAX_TURNS + " turns.");
-        return new Insight("Partial analysis", "The analysis agent reached its tool-call limit before completing the report.", "Some repository evidence may not have been collected.", "Please run the analysis again. The agent was limited to " + MAX_TURNS + " steps.");
+        return new Insight("Partial analysis", "The analysis agent reached its tool-call limit before completing the report.", "Some repository evidence may not have been collected.", "Please run the analysis again. The agent was limited to " + MAX_TURNS + " steps.", readme, fileTree, recentCommits, fetchedFiles);
     }
 
     private JsonObject callGemini(JsonObject payload, String key) throws ApiException {
@@ -194,14 +208,14 @@ public class GeminiService {
         conversation.add(content);
     }
 
-    private Insight reportFrom(JsonObject args, java.util.List<String> fileTree) {
+    private Insight reportFrom(JsonObject args, java.util.List<String> fileTree, String readme, java.util.List<String> recentCommits, Map<String, String> fetchedFiles) {
         String summary = clean(args, "summary");
         String architecture = clean(args, "architectureNotes");
         String technology = clean(args, "technologyInsights");
         String recommendations = clean(args, "recommendations");
         boolean claimedHasTests = args.has("claimedHasTests") && args.get("claimedHasTests").getAsBoolean();
         if (claimedHasTests && !containsTestPath(fileTree)) recommendations = appendNote(recommendations, "The report claimed automated tests, but the fetched file tree contains no test/, tests/, or __test__ path.");
-        return new Insight(summary, architecture, technology, recommendations);
+        return new Insight(summary, architecture, technology, recommendations, readme, fileTree, recentCommits, fetchedFiles);
     }
 
     private boolean containsTestPath(java.util.List<String> paths) {
