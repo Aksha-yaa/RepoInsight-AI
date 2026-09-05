@@ -12,7 +12,6 @@ import java.util.*;
 
 public class GitHubService {
     private final HttpClient client = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NORMAL).build();
-    private final Gson gson = new Gson();
     private final String token = Config.get("GITHUB_TOKEN", "");
 
     public RepositoryData analyze(String repositoryUrl) throws ApiException {
